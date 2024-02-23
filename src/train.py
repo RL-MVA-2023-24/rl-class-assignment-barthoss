@@ -38,13 +38,14 @@ class DQN(nn.Module):
      
 class ProjectAgent:
     def __init__(self,
-                gamma=0.95,
-                hidden_layers=[32,128,256,128,32],
+                gamma=0.98,
+                grad_iter=3,
+                hidden_layers=[256,256,256,256],
                 learning_rate=0.001,
                 buffer_size=50000,
                 batch_size=512,
-                update_cycle=200,
-                n1=50,
+                update_cycle=400,
+                n1=3,
                 n2=100,
                 epsilon1=1.,
                 epsilon2=0.01) :
@@ -55,6 +56,7 @@ class ProjectAgent:
         
         self.hidden_layers=hidden_layers
         self.learning_rate=learning_rate
+        self.grad_iter=grad_iter
 
         self.target_network=DQN(input_dim=self.state_size,
                                 hidden_layers=hidden_layers,
@@ -108,31 +110,32 @@ class ProjectAgent:
     def train(self) :
         if self.buffer_pos<self.batch_size :
             return
-        
-        observations,actions,rewards,next_observations,dones = self.sample()
-        observations=torch.as_tensor(observations,dtype=torch.float32)
-        actions=torch.as_tensor(actions,dtype=torch.int64)
-        rewards=torch.as_tensor(rewards,dtype=torch.float32)
-        dones=torch.as_tensor(dones,dtype=torch.float32)
-        next_observations=torch.as_tensor(next_observations,dtype=torch.float32)
 
-        with torch.no_grad():
-            next_q_values_policy=self.policy_network(next_observations)
-            next_q_values_target=self.target_network(next_observations)
-            next_actions=next_q_values_target.argmax(axis=-1)
-
-            next_q_values_target=next_q_values_policy.gather(index=next_actions[:,None],axis=1)[:,0]
+        for _ in range(self.grad_iter) :
+            observations,actions,rewards,next_observations,dones = self.sample()
+            observations=torch.as_tensor(observations,dtype=torch.float32)
+            actions=torch.as_tensor(actions,dtype=torch.int64)
+            rewards=torch.as_tensor(rewards,dtype=torch.float32)
+            dones=torch.as_tensor(dones,dtype=torch.float32)
+            next_observations=torch.as_tensor(next_observations,dtype=torch.float32)
+    
+            with torch.no_grad():
+                next_q_values_policy=self.policy_network(next_observations)
+                next_q_values_target=self.target_network(next_observations)
+                next_actions=next_q_values_target.argmax(axis=-1)
+    
+                next_q_values_target=next_q_values_policy.gather(index=next_actions[:,None],axis=1)[:,0]
+                
+                target=rewards+self.gamma * next_q_values_target * (1.-dones)
+    
+            q_values=self.policy_network(observations)
+            q_values=q_values.gather(index=actions[:,None],axis=1)[:,0]
             
-            target=rewards+self.gamma * next_q_values_target * (1.-dones)
-
-        q_values=self.policy_network(observations)
-        q_values=q_values.gather(index=actions[:,None],axis=1)[:,0]
-        
-        loss = F.mse_loss(q_values,target)
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+            loss = F.mse_loss(q_values,target)
+    
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
         self.n_step_train+=1
         if self.n_step_train%self.update_cycle==0 :
