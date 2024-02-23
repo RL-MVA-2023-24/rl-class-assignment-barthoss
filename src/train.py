@@ -38,11 +38,11 @@ class DQN(nn.Module):
      
 class ProjectAgent:
     def __init__(self,
-                gamma=0.8,
-                hidden_layers=[32,64,32],
-                learning_rate=0.0001,
+                gamma=0.95,
+                hidden_layers=[32,128,256,128,32],
+                learning_rate=0.001,
                 buffer_size=50000,
-                batch_size=32,
+                batch_size=512,
                 update_cycle=200,
                 n1=50,
                 n2=100,
@@ -198,7 +198,7 @@ def seed_everything(seed: int = 42):
     torch.backends.cudnn.benchmark = False
     torch.cuda.manual_seed_all(seed)
 
-def train_agent(agent: Agent, env: gym.Env, nb_episode: int = 120) -> float:
+def train_agent(agent: Agent, env: gym.Env, nb_episode: int = 200) -> float:
     agent.eval_off()
     for k in range(1,nb_episode+1):
         seed_everything(k)
