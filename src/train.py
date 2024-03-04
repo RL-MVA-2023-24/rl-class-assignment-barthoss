@@ -7,9 +7,7 @@ import torch.nn.functional as F
 from interface import Agent
 import gymnasium as gym
 import pickle
-import random
-import os
-from evaluate import evaluate_HIV, evaluate_HIV_population
+from evaluate import evaluate_HIV
 
 env = TimeLimit(
     env=HIVPatient(domain_randomization=False), max_episode_steps=200
@@ -95,11 +93,11 @@ class DQN(nn.Module):
      
 class ProjectAgent:
     def __init__(self,
-                gamma=0.98, #discount factor for bellman equation
+                gamma=0.95, #discount factor for bellman equation
                 grad_iter=3, #number of descent grad per train iteraion
                 hidden_layers=[256,256,256,256,256], #size of the hidden layers of the DQN
-                learning_rate=0.001, #learning rate of optimizer
-                buffer_size=50000, #buffer size
+                learning_rate=0.0007, #learning rate of optimizer
+                buffer_size=200_000, #buffer size
                 batch_size=1024, #batch size during learning
                 update_cycle=400, #number of train iteration between target/policy sync
                 epsilon1=1.,  #epsilon exploration at the beginning of the learning
@@ -116,7 +114,6 @@ class ProjectAgent:
         self.hidden_layers=hidden_layers
         self.learning_rate=learning_rate
         self.grad_iter=grad_iter
-        self.dropout=dropout
 
         self.target_network=DQN(input_dim=self.state_size,
                                 hidden_layers=hidden_layers,
@@ -250,20 +247,9 @@ class ProjectAgent:
         if path_buffer is not None :
             self.buffer.load(path_buffer)
         
-def seed_everything(seed: int = 42):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.cuda.manual_seed_all(seed)
-
-def train_agent(agent: Agent, env: gym.Env, nb_episode: int = 190) -> float:
+def train_agent(agent: Agent, env: gym.Env, nb_episode: int = 200) -> float:
     agent.eval_off()
     for k in range(1,nb_episode+1):
-        seed_everything(k)
         obs, info = env.reset()
         done = False
         truncated = False
